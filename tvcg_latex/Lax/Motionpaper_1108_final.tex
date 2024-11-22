@@ -1,0 +1,349 @@
+\documentclass[10pt,journal,cspaper,compsoc]{IEEEtran}
+
+\usepackage{graphicx}	% A package for graphics use (see figures)
+\usepackage{times}
+\usepackage{mathptmx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{subfigure}
+\usepackage{array}
+%\usepackage{tabularx}
+%\usepackage{cite}
+
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+\begin{document}
+
+\title{Human Motion Retrieval from Hand-Drawn Sketch}
+
+\author{Min-Wen~Chao$^1$,Chao-Hung~Lin$^1$,Jackie Assa$^2$,Tong-Yee~Lee$^1$, \emph{Senior Member}, \emph{IEEE}\\
+        National Cheng Kung University, Taiwan$^1$\\
+        Tel Aviv University, Israel$^2$}
+%\IEEEcompsocitemizethanks{\IEEEcompsocthanksitem M. Shell is with the Department
+%of Electrical and Computer Engineering, Georgia Institute of Technology, Atlanta,
+%GA, 30332.\protect\\
+%% note need leading \protect in front of \\ to get a newline within \thanks as
+%% \\ is fragile and will error, could use \hfil\break instead.
+%E-mail: see http://www.michaelshell.org/contact.html
+%\IEEEcompsocthanksitem J. Doe and J. Doe are with Anonymous University.}% <-this % stops a space
+%\thanks{}}
+
+%\markboth{Journal of \LaTeX\ Class Files,~Vol.~6, No.~1, January~2007}
+%{Shell \MakeLowercase{\textit{et al.}}: Bare Demo of IEEEtran.cls for Computer Society Journals}
+
+
+\IEEEcompsoctitleabstractindextext{%
+\begin{abstract}
+%\boldmath
+The rapid growth of motion capture data increases the importance of motion retrieval. The majority of the existing motion retrieval approaches are based on a labour intensive step in which the user browses and selects a desired query motion clip from the large motion clips database. In this work, a novel sketching interface for defining the query is presented. This simple approach allows users to define the required motion by sketching several motion strokes over a drawn character, which requires less effort and extends the users' expressiveness. To support the real-time interface, a specialized encoding of the motions and the hand-drawn query is required. Here, we introduce a novel hierarchical encoding scheme based on a set of orthonormal spherical harmonic basis functions (SHs), which provides a compact representation, and avoids the CPU/processing intensive stage of temporal alignment used by previous solutions. Experimental results show that the proposed approach can well retrieve the motions, and is capable of retrieve logically and numerical similar motions, which is superior to previous approaches. The user study shows that the proposed system can be a useful tool to input motion query if the users are familiar with it. Finally, an application of generating a 3D animation from a hand-drawn comics strip is demonstrated.
+\end{abstract}
+
+% Note that keywords are not normally used for peer review papers.
+\begin{keywords}
+motion retrieval, spherical harmonic function, sketching interface.
+\end{keywords}}
+
+
+% make the title area
+\maketitle
+
+\IEEEdisplaynotcompsoctitleabstractindextext
+
+\IEEEpeerreviewmaketitle
+
+\section{Introduction}
+Over the last decade, we witness an explosion in the usage of motion capture (mocap) data in games and animations. The manipulation of mocap data by methods such as motion retargeting \cite{01}, motion overview \cite{38} and motion synthesis \cite{02, 03, 04, 05, 06, 07, 39} requires an easy, efficient and accurate retrieval of similar motions from a large data repository. Therefore, it is important to provide an appropriate interface to generate queries for motion retrieval. Previous approaches utilize an existing motion clip as a query term. This generally requires users to examine a large number of examples in the motion repository by reviewing the motions, which is very tedious and time-consuming \cite{08, 09, 10, 11, 12}. A different common retrieval method is by using the motion textual description such as "walking" or "running". Although it is very efficient in text matching as well as retrieval, textual descriptions cannot always sufficiently express 3D motions and requires manual work in annotating the motions in the repository.
+
+Motion lines sketches is an effective technique to convey motion, as shown in traditional comics \cite{13}. Following this observation, we propose a novel sketching interface which allows drawing of motion lines over a character figure, and show that these details are sufficiently expressive for locating similar motions. Our proposed method allows iterative refinement of the selections, restricting the motion to fit a more accurate pose description. By combining with a fast encoding of the query and motion repository, the proposed system can be used in interactive scenarios.
+
+Conveying a motion by using sketches presents a new challenge in determining the desired temporal sequence of the motion details. However it overcomes the known time-warp effort required by many of the existing motion retrieval systems \cite{08, 09, 14, 15}. This effort usually requires either the repository motion or the query sequence to be warped in many temporal scales, so that different motion speeds would not filter out suitable results. The key idea behind the proposed scheme is representing the motion trajectories by using a complete set of SHs, which demonstrates several suitable properties. The trajectory represented by a few SHs (a coarse but smooth approximation) is shown to be similar to the motion strokes. Moreover, the SH encoding reduces the data description dimensions and presents a compact shape descriptor, reducing both the storage size and search time. Finally, the inherent properties of rotation-invariant and multi-scale nature of SHs encoding allows an efficient matching and indexing of the motion database.
+
+While the usage of SHs in general data retrieval was suggested before \cite{16, 17}, to the best of our knowledge, the proposed approach is the first to utilize SHs in the encoding of mocap data, i.e., a time-varying character motion data. Our work therefore presents two major contributions: 1) offering a natural sketching interface for describing the query, and 2) introducing a novel motion encoding method for retrieving motion in a coarse-to-fine manner.
+
+\begin{figure*}[htb]
+  \centering
+  \includegraphics[width=0.8\linewidth]{IMG/Figure1.png}
+  \caption{System workflow. An illustration of (a) motion database and (b) encoding motion trajectories by SHs; (c) SHs coefficients (3$^{rd}$ level of articulated hierarchy); (d) drawing a sketch as query; (e) encoding query by SHs; (f) coefficient matching and ranking.}
+  \label{Figure1}
+\end{figure*}
+
+\section{Related Work}
+Motion indexing and retrieval, first proposed by Liu et al, had become crucial to the reuse of motion capture data in games and animations. Over the time, several methods were suggested, which can be classified into two categories, content-based retrieval \cite{08, 09, 14, 15, 23} and numerical-based retrieval \cite{10, 11, 12, 19, 20, 21, 22}, based on the measurement used to measure motion similarity (i.e., logical or numerical similarity).
+
+The methods based on numerical similarity usually measure the distance between poses as a difference of the joint positions. One of the main challenges in the numerical-based approaches is how to handle any temporal difference between the query motion and the motions in the database. One of the leading methods for handling this challenge is dynamic time warping (DTW) which exhaustively compares the query and result clip frames to non-linearly align the time in both clips. As a result, DTW had become essential to every motion indexing structure and is applied to many motion repositories \cite{08, 09, 14}. The work of Chiu et al. introduces a two-stage motion retrieval approach \cite{08}. They identify the start and end frames of possible candidate motion clips using a pose-based index and calculate the similarity between the query motion clip and each candidate clip using DTW. The work of Forbes and Fiume suggests a search algorithm based on weighted principle component analysis (wPCA) \cite{09}. Each motion in the database is represented as a high-dimensional parametric curve in a wPCA space. They apply a space-search strategy to prune away non-relevant motions, as a preliminary step before applying the DTW on the remaining results to locate the best matching answers. Kovar et al. propose a multi-step search strategy \cite{14}. They first reproduce new queries from previously retrieved motions in order to find more relevant motions. This approach can extract a family of related motions that are particularly suitable for the motion blending applications. The pairwise comparison of motions in these methods for the database motions is time-consuming which makes the related applications infeasible for a large data set. To avoid the DTW effort, our method encodes the trajectories and the spatiotemporal variances of motions by SHs. Thus, the process of time-warping is not required and the query time and storage space is considerably reduced.
+
+Logical similarity was introduced by M\"{u}ller et al. \cite{11} and later extended by Lin \cite{21} and M\"{u}ller et al. \cite{22} (i.e., content-based retrieval). Logical similarity uses boolean geometric pose properties which describes geometric relations between several specified body joints. Using this representation, a complex motion retrieval problem is translated to a simple bit string matching problem, which is significantly faster than comparing the original numeric vector describing the motion, and easier to maintain. Nevertheless, the selection of proper geometric relations in addition to a motion query highly affects the performance and quality of the results. Recently, an approach based on motion pattern extraction and matching was suggested by Deng et al. \cite{12}. After picking a motion clip as query input, this approach can efficiently retrieve logically similar motions. Our method includes a sketching interface for describing motion query is provided. Users do not need to specify a short motion clip and even additional geometric relations. The work of Ho et al. introduces an indexing approach for multiple characters \cite{36}. They represent and encode topological relationships of multiple characters by rational tangles. Thus, this approach can be applied to scenes with close interactions between multiple characters.
+
+Recently, sketch-based interface research was suggested in several fields. A number of researches propose sketching interfaces for 3D modeling \cite{24, 25, 26} and motion creation \cite{06, 27, 28}. In the work of Davis et al. \cite{27}, an interface for creating 3D articulated figure animation is presented. This system infers 3D poses from 2D sketches using the information of bone lengths. However, to create a motion, several successive key poses must be drawn by users. Thorne et al. introduce a more convenient approach where a motion is created by sketching a continuous sequence of lines, arcs, and loops \cite{06}. They are parsed and then mapped to a parameterized set of motions. A sketch system for creating Kung-fu motions is presented in the work of Li et al. \cite{28}. They use sketches to describe the first and last postures as. Next, they retrieve the similar postures as well as the in-between motions by projecting the frames and the 3D database motion trajectories to 2D plane, and matching them in that space. As a result, the 2D plane projection causes significant motion information to be disregarded during the query. In this paper, a single sketch containing some motion strokes (i.e., similar to traditional comics) is taken as query input. The motion trajectories are encoded by SHs and directly compared in 3D.
+
+\section{System Overview}
+The proposed system, shown in Figure 1, consists of two major parts: \emph{motion encoding} and \emph{motion retrieval}. The main idea is to encode the motion trajectories of the query and the clips in the database by using a small set of SHs (Figure 1(b), (e)). This allows an efficient indexing of the motions and a fast retrieval, by matching the SHs coefficients of the motions. To support complex motion clips which contain several actions, we begin by splitting such clips into sub-clips. Each sub-clip contains only one action. In our implementation, the segmentation is done by locating the key poses. As shown by Barbic et al. \cite{29}, other robust motion segmentation approaches can be used for this purpose as well. Next, we encode the full-body motion according to the character body coarse to fine hierarchy. This hierarchy is organized in 4 levels: full body, upper/lower body, all the body main limbs (leg, arm, etc), and the body joints. This separation introduces 39 trajectories for each clip, which are used as the motion description. This description supports queries describing movement in several scale - both full body motion and up to movement of the various joints, and lets our system has the flexibility and ability of retrieving logically and numerically similar motions. To retrieve motions, the user sketches the desired motion (Figure 1(d)). The 3D trajectory of query is inferred from the 2D motion strokes, and then encoded too by SHs. Utilizing the inherent multiresolution property of SHs, a coarse-to-fine coefficient matching is adopted to speed up the retrieval.
+
+\section{Spherical Harmonics}
+To encode the motions in database, a small set of spherical harmonics are used to represent the motion trajectories. Following is a brief introduction to spherical harmonics (SHs). For a more comprehensive overview of SHs, we refer the readers to \cite{30}. A spherical harmonic of degree $l$ and order $m$, $Y^m_l(\theta,\phi)$, is defined as:
+\begin{equation}
+Y^m_l(\theta,\phi)=\sqrt{\frac{2l+1}{4\pi}\frac{(l-m)!}{(l+m)!}}P^m_l(\cos\theta)e^{im\phi}
+\end{equation}
+where $l$ and $m$ are integers that satisfy $l\geq0$ and $|m|\leq l$; $\theta\in[0,\pi]$ and $\phi\in[0,2\pi)$ represent latitude and longitude, respectively. The associated Legendre polynomial $P^m_l$ in Eq. (1) is defined as:
+\begin{equation}
+P^m_l(x)=\frac{(-1)^m}{2^ll!}(1-x^2)^{m/2}\frac{d^{l+m}}{dx^{l+m}}(x^2-1)^l
+\end{equation}
+The spherical harmonic functions constitute a complete orthonormal system on a sphere. Any square-integrable functions $f(\theta,\phi)$ on a sphere can be expressed by a linear combination of these:
+\begin{equation}
+f(\theta,\phi)=\sum^\infty_{l=0}{\sum^l_{m=-l}{a^m_lY^m_l(\theta,\phi)}}
+\end{equation}
+where $a^m_l$ is the coefficient of spherical harmonic $Y^m_l(\theta,\phi)$. Given a maximum degree (or called bandwidth) $l_{max}$, an orthonormal system expanded by spherical harmonics involves $(l_{max}+1)^2$ coefficients. For a function with $n$ spherical samples $(\theta_i,\phi_i)$  and their function values $f_i=f(\theta_i,\phi_i)$, $1\leq i\leq n$  (i.e., $f_i$ is calculated by Eq.(3)), these coefficients $a^m_l$ can be obtained by solving a least-square fitting \cite{31}:
+\begin{equation}
+\begin{pmatrix}
+    y_{1,1} & y_{1,2} & \cdots & y_{1,k} \\
+    y_{2,1} & y_{2,2} & \cdots & y_{2,k} \\
+    \vdots & \vdots &   & \vdots \\
+    y_{n,1} & y_{n,2} & \cdots & y_{n,k}
+\end{pmatrix}
+\begin{pmatrix}
+    b_1 \\ b_2 \\ \vdots \\ b_k
+\end{pmatrix}
+=
+\begin{pmatrix}
+    f_1 \\ f_2 \\ \vdots \\ f_k
+\end{pmatrix}
+\end{equation}
+where $y_{i,j}=Y^m_l(\theta_i,\phi_i)$ and $b_j=a^m_l$, $j=l^2+l+m+1$ and $k=(l_{max}+1)^2$.
+Any spherical function can be represented by three explicit functions $f(\theta,\phi)=(f_x(\theta,\phi),f_y(\theta,\phi),f_z(\theta,\phi))$ and the coefficients calculated by Eq. (4) are 3-tuple vectors $a^m_l=(a^m_{lx},a^m_{ly},a^m_{lz})$. By utilizing the fact that the L2-norm of SHs coefficients is rotation-invariant \cite{30}, we represent a motion as a spherical function $f(\theta,\phi)$ and then encode it as:
+\begin{multline}
+SH(f(\theta,\phi))=(\{\|a^m_0\|\}^0_{m=0},\\
+\{\|a^m_1\|\}^1_{m=-1},\cdots,\{\|a^m_{l_{max}}\|\}^{l_{max}}_{m=-l_{max}})
+\end{multline}
+This motion encoding is compact and has several useful properties for retrieval which will be discussed in Section 8.1.
+
+\begin{figure*}[htb]
+  \centering
+  \includegraphics[width=0.7\linewidth]{IMG/Figure2_1.png}
+  \caption{An illustration of the different encoding levels (top) and their respective motion trajectories (bottom).}
+  \label{Figure2}
+\end{figure*}
+\begin{figure*}[htb]
+  \centering
+  \includegraphics[width=0.8\linewidth]{IMG/Figure3.png}\\
+  \caption{The joint trajectory (left ankle of walking motion) reconstruction. From left to right: The original joint trajectory, the reconstruction results of different setting of $l_{max}=2,9,29$, respectively.}
+  \label{Figure3}
+\end{figure*}
+
+\section{Motion Encoding}
+We define the sequence of connected joint locations over time as a 'trajectory surface' --  a manifold in spatial-temporal space. The key idea behind the proposed scheme is representing the trajectory surface by SHs. In this section, we first describe the preprocessing phase (Section 5.1) followed by the SHs encoding phase (Section 5.2).
+\subsection{Data preprocessing}
+To reduce the sensitivity to different character size and proportions, and to use a common coordinate system, we first normalize and align the motion data. The normalization is performed by rescaling the skeleton to have a standard distance between root and neck joints. Since the SHs representation is translation-sensitive, we align the motions by translating the character root in all poses to the origin of a unit sphere $S(\theta,\phi)$, while the origin of unit sphere is set to the origin of world coordinate. The poses in a motion (i.e., the significant characteristics) are preserved in this preprocess and thus, the motion retrieval will not be affected. If the absolute details are required, they can be added in the encoding of the root joint. Next, to retrieve similar motions, the motion is captured by a multi-level structure (see Figure 2). The first level is the whole body. Then, the second level includes two body parts: upper body and lower body, and the following level includes the body limbs (arms and legs) and head. In the last level, each node contains the trajectory of a joint of the original motion, and all joint trajectories are saved in this level. In this manner, the proposed system is capable of retrieving logically similar motions by using the information of higher levels of articulated hierarchy (1$^{st}$ or 2$^{nd}$ level) and retrieving numerical similar motions by using the information of lower levels (3$^{rd}$ or 4$^{th}$ level). A demonstration of this property will be shown in the Section 8.2.
+
+\subsection{Encoding motion trajectory with spherical harmonic functions}
+The trajectory surface of a given motion is first transformed to a spherical system in which the spherical coordinate $(\theta,\phi)$ of each joint position is calculated, the trajectory surface is approximated by SHs (using Eqs. (3)-(5)). The L2-norm of SHs coefficients is used to encode the joint trajectories. Each motion $M$ is encoded as:
+\begin{equation}
+SH(M)=(SH(M_{level1}),SH(M_{level2}),SH(M_{level3}),SH(M_{level4}))
+\end{equation}
+where $M_{leveli}$ represents the trajectory surface of the nodes in level $i$.
+Note that the original joint trajectories can be reconstructed/approximated by these coefficients with SHs:
+\begin{equation}
+f'(\theta,\phi)=\sum^{l_{max}}_{l=0}{\sum^l_{m=-l}{a^m_lY^m_l(\theta,\phi)}}\approx f(\theta,\phi)
+\end{equation}
+The trajectories approximated by SHs with different maximum degree of $l_{max}$ are shown in Figure 3. Using additional coefficients can achieve a more accurate reconstruction, whereas fewer coefficients have similar effect to curve smoothing (which is similar to the user-drawn motion stroke in shape). In our experiments, the maximum degree $l_{max}$ is set to 4 and the L2-norm of coefficients $|a^m_l|$ encodes the motion trajectory. Since the coefficients $a^m_l$ are complex conjugate of the coefficients $-a^m_l$, i.e., $|a^m_l|=|-a^m_l|$, we only use the coefficients $a^m_l$ with $m\geq0$ (i.e., 15 coefficients) to encode the trajectory in a node for the purpose of efficient retrieval and storage. As a result, given an $n_{joint}$-joints action, $15*(n_{joint}+8)$  coefficients in total are used to encode and index the action regardless of its temporal length and speed.
+
+\section{Sketching Interface}
+The sketching interface allows users to define the motion by simply drawing a motion line \cite{32} (called "motion stroke") describing the character motion. The motion stokes are drawn on a selected character pose and a selected view. The main goal of the method is to infer the corresponding 3D trajectories from the hand-drawn strokes. We begin by allowing the user to select a desired character pose and camera view from a set of predefined key-poses and their default camera viewpoints. Next, the user specifies the motion by adding strokes to the character. Using a single key posture for motion retrieval is insufficient to distinguish between motions, as shown in figure 4. In out method, we propose using motion lines, on top of the selected posture, to better define the desired motion. For example, in Figure 4, we add different motion lines to retrieve different motions.
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=\linewidth]{IMG/Figure4_1.png}
+  \centering
+  \caption{Different motions may have similar key postures. For example, the motions of hand spring and leap (left), the motions of backflip and sitting (middle), and the motions of jumping jack and leap.}
+  \label{Figure4}
+\end{figure}
+
+Next we predefine the motion from the motion strokes in the following manner. Each of the hand-drawn motion strokes is approximated to an ellipsoid. This type of quadric surface is a good candidate for trajectory fitting of many hand-drawn sketches, and is relatively robust to the camera viewpoint differences. We assign each stroke to the joint nearest to its starting point. The corresponding joint is called active joint, denoted as $Joint_A$ shown in Figure 5. In addition, we define a pivot joint, denote as $Joint_P$, for each active joint. In Figure 5, for example, the active joint is the ankle joint, and its pivot joint is the hip joint. An ellipsoid is defined by a center $C:(x_c,y_c,z_c)$ and three principle axes: $axis_a$, $axis_b$ and $axis_c$. The center is set to the position of pivot joint $C=Joint_P$. We first determine the ellipse formed by the first two axes $axis_a$ and $axis_b$, and then determine the third axis $axis_c$. Here, two reference points $V_{ref1}$ and $V_{ref2}$ with the maximum and minimum pressures are used to determine the ellipse. We assume that the length of the major axis $|axis_a|$ is the length of revolving bones (from the pivot joint to the active joint), and these two reference points lie on the ellipse. The depth (z-coordinate) of the reference points are inferred from the stroke pressure $P:[0,1]$ (see Figure 5). The full $(P=1)$ and empty pressure $P=0$ represent the movement limits of revolving bones in the +z- and -z-direction, respectively. The depth of these two extreme end points ($P=1$ and $P=0$) is calculated by
+\begin{equation}
+len_z=2\sqrt{|axis_a|^2-|Joint_A-Joint_P|^2_{xy}}
+\end{equation}
+where $||^2_{xy}$ represents the distance in xy-plane. Then, for an arbitrary point $X$ with pressure $P(X)$, its z-coordinate $z_x$ is calculated by
+\begin{equation}
+z_x=z_{Joint_P}+(2P(X)-1)\times len_z/2
+\end{equation}
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.55\linewidth]{IMG/Figure5.png}
+  \caption{An illustration of pivot and active joints (left) and the depth calculation (right).}
+  \label{Figure5}
+\end{figure}
+
+To find an ellipse under the constraints of $|axis_a|=\|z_{Joint_A}-Z_{Joint_P}\|$, the axis $axis_a$ lying between $\overrightarrow{CV_{ref1}}$ and $\overrightarrow{CV_{ref2}}$ and the ellipse passing through the reference points  $V_{ref1}$ and $V_{ref2}$, a binary search strategy is adopted. In each step, the major axis is set to the middle of the search range $\lfloor\overrightarrow{CV_a},\overrightarrow{CV_b}\rfloor$. Then, we find two ellipses with $|axis_b|=b_1$ and $|axis_b|=b_2$, respectively. If $b_1>b_2$, we will search the left half range $\lfloor\overrightarrow{CV_a},\overrightarrow{CV_m}\rfloor$. IF $b_2>b_1$, we will search the right half range $\lfloor\overrightarrow{CV_m},\overrightarrow{CV_a}\rfloor$. This process will continue until an ellipse is found, (i.e., $b_1=b_2$). Next, we determine the length of $axis_c$ which is affected by the stroke bounding box (i.e., the 3D box with the smallest space which the stroke lies within) as shown in Figure 6. Therefore, the length of $axis_c$ must satisfy the following requirement: the projection of ellipsoid (project to the working plane) just encloses the motion stroke. Similarly, a binary search strategy is adopted here. The ellipsoid formed by an estimated $|axis_c|$ is first projected to the working plane, and then check to see if the requirement is satisfied. If not, the ellipsoid formed by $|axis_c|/2$ or $3|axis_c|/2$ is checked. This process continues until the requirement is met (i.e., $b_1=b_2$).
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.7\linewidth]{IMG/Figure6.png}
+  \caption{The ellipse in the working plane (left) and two examples of the axis c (middle and right).}
+  \label{Figure6}
+\end{figure}
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.6\linewidth]{IMG/Figure7.png}
+  \caption{An example of motion stroke projection. Left: two possible motion paths (red and green paths); Right: the correct motion path (the red path).}
+  \label{Figure7}
+\end{figure}
+
+Once the ellipsoid is created, the 3D path of motion stroke can be obtained by simply projecting the motion stroke to the ellipsoid in +z or -z direction. Therefore, two possible 3D paths on the ellipsoid can be obtained (see Figure 7 Left). The desired path will be the one which is close to the active joint as shown in Figure 7 Right. In Figure 8, we show the results of lifting motion strokes with different stylus pressures to 3D. The pressure is represented by line width. In this example, the stroke with higher pressures generates a motion path with larger lifting. Note that specifying depth of the hand-drawn stroke by using stylus pressure would be not easy for some beginners. An alternative approach is to design a set of patterns with various line widths. The line width means the pressure and depth. In sketch, the user selects a pattern for a motion stroke. Then, the sketched path is lifted according to the line width. The depth calculation is similar to Eqs. (8) and (9).
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.8\linewidth]{IMG/Figure8.png}
+  \caption{3D trajectories inferred from motion strokes with different stylus pressures.}
+  \label{Figure8}
+\end{figure}
+\begin{figure*}[htb]
+  \centering
+  \includegraphics[width=0.8\linewidth]{IMG/Figure9.png}
+  \caption{Left: the SH coefficients of various similar walk motions including normal-speed, fast, slow, leg-wild, and backward walking motions. Right: the SH coefficients of various similar jump-kick motions including normal jump-kick, jump-kick from running, spinning and walking. The y-axis represents the difference of coefficients between the normal-speed walk (left) or normal jump-kick (right) and the tested motions.}
+  \label{Figure9}
+\end{figure*}
+
+\section{Indexing and Ranking}
+Our encoding is multi-scale. This property allows an efficient coarse-to-fine indexing and ranking scheme. A 31-joints skeleton motion is represented by 39-nodes as shown in Figure 2, each encoded by using 15 coefficients to describe its motion: $\{(a^m_0)^0_{m=0},\cdots,(a^m_4)^4_{m=0}\}$ (each $|a^m_l|$ is the coefficient of degree $l$ and order $m$.). To efficiently retrieve similar motion, the following ranking strategy is used. The three lowest-frequency coefficients are used to define the criteria of the retrieved population. The rest of coefficients (i.e., $(|a^m_2|)^2_{m=0}$, $(|a^m_3|)^3_{m=0}$, $(|a^m_4|)^4_{m=0}$) are used to rank the resulting motions within the returned motions population. This provides a good set of alternatives from which the user can select the motion which is best suited for his purposes from a larger set of motions which are similar to the query. To better focus the retrieval on the action characteristics, we consider the node significance by applying a simple weighting scheme based on the motion area suggested by Kwon and Lee \cite{33}. Specifically, for the query, we determine a weight for each node according to its movement. For example, the nodes of the lower body have larger weights in a kicking motion, and the nodes of the upper body have larger weights in a punching motion. As a result, a higher contribution is given to
+distance between nodes with larger saliency, as shown next:
+\begin{multline}
+dist(M,Q)=w_i\|SH(M_{node_i})-SH(Q_{node_i})\|,\\
+node_i\in \mbox{a specific level of hierarchy}
+\end{multline}
+where M and Q represent a motion in the database and query, respectively.
+
+\section{Results and Discussion}
+
+\subsection{Properties with SHs motion encoding}
+Motion matching based on our encoding introduces several properties. First and foremost, our method provides a metric in which similar motions have small distance and dissimilar ones have larger distance. To demonstrate this property, two sets of similar motions are tested. The encoding results are shown in Figure 9. The walking motions of normal-speed, fast, slow, leg-wide, and backward have distinguishable coefficients. The jump-kicking motions from running, spinning and walking also have distinguishable coefficients. Second, the SHs coefficients are inherently rotation-invariant. As shown in Figure 10, the coefficients remain unchanged when rotations are applied to a motion. Compared to the traditional wavelet transform, the SHs encoding has no restriction on the data size and the property of rotation invariant is intrinsic. Although some advanced works on wavelet transform had solved these two problems by using additional processes, the SHs encoding is more suitable in motion encoding, in terms of simplicity. Third, our method does not require any time-warping and time alignment processing since the similarity is computed regardless of motion speeds and lengths. Figure 11 shows an experiment on similar action motions which are temporally different. The generated coefficients of the motion trajectories are similar. Another example is shown in Figure 12 where two walking motions are presented and the coefficients of a single cycle of walking sequence are similar to that of multiple cycles of walking sequence. These two examples also demonstrate how repetitive motions are efficiently encoded and retrieved. Fourth, the SH encoding leads to a reduction of dimensionality in shape description since only a small set of SHs coefficients is used.
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.7\linewidth]{IMG/Figure10.png}
+  \caption{Demonstration of rotation invariance. The coefficients remain unchanged when rotations are applied to a motion.}
+  \label{Figure10}
+\end{figure}
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.65\linewidth]{IMG/Figure11.png}
+  \caption{Encoding of time-warped motions. Top: The time-warped walking motions (points represent the location of ankle joint at each frame in the clip); Bottom: The encoding results.}
+  \label{Figure11}
+\end{figure}
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.65\linewidth]{IMG/Figure12.png}
+  \caption{Encoding (bottom) of repetitive motions (top). Left: a single walk cycle; Right: three cycles of a walk sequence.}
+  \label{Figure12}
+\end{figure}
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=\linewidth]{IMG/Figure13.png}
+  \caption{Motion encoding result. A database containing 21 classes of motions is tested (top). The motions are displayed by colors (blue: cartwheel; red: front hand flip; pink: kickflip; yellow: side flip and so on) and plotted on a 2D frame (bottom).}
+  \label{Figure13}
+\end{figure}
+
+\subsection{Encoding Results}
+To demonstrate the feasibility of the proposed encoding approach, a database containing 21 motion classes was tested (see Figure 13). The motions are encoded and plotted on a 2D frame according to their coefficients. The axes are determined by the principle component analysis (PCA) of the joints' coefficients. The motions are displayed by colors. The result shows that similar motions can easily be grouped by their coefficients and thus, the proposed encoding approach can well distinguish these motions.
+
+\subsection{Retrieval Evaluation and Applications}
+\textbf{Database and Timing.} We tested our approach on a database containing about 6000 clips with 1009700 frames from the public CMU motion database \cite{34}. All experimental results are evaluated on a PC with a 2.13 GHz CPU and 2.0GB memory. Our system takes on average 18 milliseconds to search the database. The time to process a query is linearly dependant on the size of the database.\\[0.01cm]
+\begin{figure*}[htb]
+  \centering
+  \includegraphics[width=0.8\linewidth]{IMG/Figure14.png}
+  \caption{The evaluation of motion retrieval. 1$^{st}$ row: the selected dataset; 2$^{nd}$ - 3$^{rd}$ rows: our approach using the coefficients of the lower part in level 2 and the lower limbs in level 3, respectively. The weights for other parts are set to 0.0; 4$^{th}$ row: retrieve by using geometric relations \cite{11}. The geometric relations $F^3_l$, $F^4_l$ (left/right foot raised, please refer to Table 1 in \cite{11}), $F^7_l$, $F^8_l$ (left/right knee bent) are selected; 5$^{th}$ row: retrieve by using DTW. The clip marked by red rectangle is the query. The trajectories of right-foot and left-foot are displayed by red and green colors, respectively.}
+  \label{Figure14}
+\end{figure*}
+\begin{figure*}[htb]
+  \centering
+  \includegraphics[width=0.8\linewidth]{IMG/Figure15.png}
+  \caption{The evaluation of motion retrieval. 1$^{st}$ row: the selected dataset; 2$^{nd}$ - 3$^{rd}$ rows: our approach using the coefficients of the upper part in level 2 and the upper limbs in level 3, respectively; 4$^{th}$ row: retrieve by using geometric relations \cite{11}. The geometric relations $F^1_u$, $F^2_u$ (left/right hand in front), $F^7_u$, $F^8_u$ (left/right elbow bent) are selected; 5$^{th}$ row: retrieve by using DTW. The trajectories of right-hand and left-hand are displayed by red and green colors, respectively.}
+  \label{Figure15}
+\end{figure*}
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.8\linewidth]{IMG/Figure16.png}
+  \caption{The retrieval results.}
+  \label{Figure16}
+\end{figure}
+\begin{table}[h]
+\renewcommand{\arraystretch}{1.5}
+\caption{Accuracy comparison between our approach using SH coefficients in level 2 and 3, and the related approaches \cite{11, 15}. The tested dataset and query are shown in Figure \ref{Figure14}. The accuracy measurement, precision $\eta_s$, recall $\eta_n$, and accuracy $\tau$, are used with optimal cutoff thresholds, and a numerical-based ground truth (the top figure) and a logical-based ground truth (the bottom figure)} \label{tab}
+\centering
+\includegraphics[width=\linewidth]{IMG/Figure15a.png}
+\begin{tabular}[t]{c| c c c}
+\hline
+ & $\eta_s(\%)$ & $\eta_n(\%)$ & $\tau$(\%)\\
+\hline
+SH Level 2   & 60.78   & 100 & 70\\
+SH Level 3   & 100   & 100 & 100\\
+G.F.   & 100   & 85.71 & 93.33\\
+DTW   & 100   & 64.29 & 83.33\\
+\hline
+\end{tabular}
+\includegraphics[width=\linewidth]{IMG/Figure15b.png}
+\begin{tabular}[t]{c| c c c}
+\hline
+ & $\eta_s(\%)$ & $\eta_n(\%)$ & $\tau$(\%)\\
+\hline
+SH Level 2   & 100   & 100 & 100\\
+SH Level 3   & 75   & 100 & 80\\
+G.F.   & 100   & 50 & 70\\
+DTW   & 85.71   & 100 & 90\\
+\hline
+\end{tabular}
+\end{table}
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.8\linewidth]{IMG/Figure19_3.png}
+  \caption{Top: The motions tested in the user study; Bottom: The motion lines sketched by users (light colors) and the corresponding motion trajectories (dark colors).}
+  \label{Figure19}
+\end{figure}
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.9\linewidth]{IMG/Figure17_5.png}
+  \caption{User satisfaction survey. Top: The survey question: please rate the usefulness of the system. Score 5 indicates positive result. Bottom: The survey question: do you want to use this system to retrieve motions if the data is very huge? Score 4 indicates positive result.}
+  \label{Figure17}
+\end{figure}
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=\linewidth]{IMG/Figure18.png}
+  \caption{A 3D animation generated from hand-drawn comic strip. Top: The 3D animation generated by concatenating the extracted motions. Bottom: the hand-drawn queries for motion retrieval.}
+  \label{Figure18}
+\end{figure}
+\noindent\textbf{Retrieval evaluation.} To evaluate the retrieval accuracy of our method, we compare with the geometric indexing approach of M\"{u}ller et al. \cite{11} and the DTW-based approach suggested by Keogh et al. \cite{15}. Here, instead of using the sketching interface, we use a selected database motion as a query in a similar manner to the evaluation of \cite{11}. These approaches are tested on two datasets containing 30 manually selected clips with similar motion (see Figures 14 and 15). Some of these clips capture different character actions. Figure 14 shows a retrieval result for a simple kicking query (marked by red quadrangle). The dataset contains left-foot kicking, right-foot kicking and other semantic motions. Figure 15 shows a query of a punch motion. The dataset contains left-hand punching, right-hand punching and other motions. From the rankings, we can see that our approach can well retrieve the motions and is capable of retrieve logically or numerical similar motions. For example in Figure 14, the query is a motion of left-foot kicking. Using the coefficients of upper part in level 2, we extract all kicking clips regardless of right-foot or left-foot kicking (i.e., logically similar motions). Using the coefficients of upper limbs in level 3, we extract all right-foot kicking clips (i.e., numerical similar motions). In the evaluation of retrieval accuracy (see Table \ref{tab}), the commonly-used measurements precision $\eta_s$, recall $\eta_n$, and accuracy $\tau$ are used. They are defined as $\eta_s=\frac{TP}{TP+FP}$, $\eta_n=\frac{TP}{TP+FN}$, and $\tau=\frac{TP+TN}{TP+TN+FP+FN}$, where $TP$, $TN$, $FP$, and $FN$ represent true positive, true negative, false positive, and false negative, respectively. To fairly compare the approaches, the optimal cutoff threshold and the correct classifications (i.e., ground truths) defined based on numerical and logical measurements are tested. If the logical-based ground truth is used, our approach using the coefficients in level 2 and the logical-based approach \cite{11} obtain better results (see the top table in Table \ref{tab}). If the numerical-based ground truth is used, our approach using the coefficients in level 3 and the numerical-based approach \cite{15} obtain better results (see the bottom table in Table \ref{tab}). This experiment shows that the proposed approach with the ability of providing both numerical-based and logical-based retrieval is superior to previous approaches.\\[0.3cm]
+\noindent\textbf{Search by sketches.}
+In our system, the user can sketch some motion strokes as query input. Figure \ref{Figure16} shows the retrieval results using the sketch system. For clearly evaluating the retrieval results, we refer the reader to the material in http://140.116.80.113/Motion Retrieval/Demo.mp4. Note that our sketching system uses a stylus and tablet, which allow us to explore additional attributes of the stroke, such as the pressure the user applies at each section of the motion stroke. Although it could be not easy to use stylus with pressure to draw motion strokes for novice tablet beginners, the motion stroke can become a good alternative to input motion query once the users are familiar with this input tool.\\[0.3cm]
+\noindent\textbf{User study.} In order to evaluate the proposed sketch interface, we conducted a user study involving 29 computer graphics students and researches with ages ranging from 21 to 37 years old. It is likely unworkable to use a dataset containing too many motion categories in the user study. Participants are likely to lose their patience/concentration in a long user study. Therefore, at least the motion categories tested in the related works \cite{11, 14, 18, 19, 20, 21, 22} are all included in our user study. Participants were required to sketch motion lines to retrieve 16 motions (including kicking, running, walking, jumping, squatting, cartwheel, jete, backflip, spinning, hand spring, and punching (see the top figure in Figure \ref{Figure19})) by the proposed system after about 15 minutes introduction. Some of the sketched lines and retrieval results are shown in Figures \ref{Figure19}\_Bottom and \ref{Figure16}, respectively. As expected, there exists some variance among people¡¦s drawings. However, these drawings can retrieve similar motion clips, since their SH encodings are similar to that of retrieved clip. In this study, our goal was to test if the users can successfully retrieve the desired motions, how long it takes, and if the proposed system is easy to use. The user response time indicates that the users can draw motion lines and extract the desired motions in 3-10 seconds in simple cases (such as simple kicking, jumping, and punch) and in about 30 seconds for complex actions (such as spinning, cartwheel, and hand spring). The results also show that the users with drawing experience or ones with prior sketching experience yield better results than no experience. Figure \ref{Figure17} shows the user satisfaction surveys. The surveys indicate that 62\% users agree that the proposed system is easy to use, but 10\% users think the proposed system is hard to use, and 89\% users would like to use the proposed system if the data is very huge. These surveys show that the proposed system can be a useful tool to input motion query if the users are familiar with it.\\[0.3cm]
+\noindent\textbf{Application.} The user working with our system can compose complex motions from a sequence of desired actions as shown in Figure \ref{Figure18}. In this case, the system uses an additional constraint to describe the common poses between the joined actions, and smoothly concatenates these extracted motions using motion blending techniques \cite{35}.
+
+\section{Conclusions, limitations and future work}
+We have presented a novel motion retrieval approach which uses a hand-drawn sketch as query input. With a novel sketching based interface, our system demonstrates a simple and novel motion-encoding approach. Users sketch some motion strokes on a selected character in a single view. The SHs encoding is highly suitable for this scenario: it removes the need of time-alignment motion analysis and provides a compact encoding reducing the search time and repository space. The experimental results show that our approach can be used in real-time scenarios and is useful in various applications of motion creation. Certain limitations still exist in our approach. Not all 3D motion curves such as complex motions of hip-hop dancing can be easily or correctly described from a 2D drawing. In such case, a query of real motion clip is required. Moreover, our system requires users to select their desired poses and camera views from a set of predefined key-poses and their default camera viewpoints. Generally, a good starting pose and a good camera view are necessary by our system. If a neutral character pose or a poor camera viewpoint is selected, it may require sketching a more complex motion lines, and thus, significantly decrease the accuracy of retrieval. Fortunately, inferring 3D character poses from 2D sketched figures \cite{27} or automatically extracting key poses and camera views \cite{38} are possible. These approaches can be potentially applied to our system. In the near future, we plan to develop an approach to infer 3D character pose from 2D sketched figure, which can avoid the selection of character pose and camera view. Besides, the generated character pose can be used in the motion retrieval as suggested by \cite {37}. Moreover, we also plan to expand the various types of sketch strokes which will allow more expressive details of the query.
+
+\section*{Acknowledgments}
+We would like to thank the anonymous reviewers for their valuable comments. We are also grateful to Yan-Bo Zeng
+for his coding at early stage of this project. The motion data used in this paper were partially collected from CMU Graphics Lab Motion Capture Database (http://mocap.cs.cmu.edu/). This work was supported in part by  the National Science Council (contracts NSC-97-2628-E-006-125-MY3, NSC-98-2221-E-006-179 and NSC-99-2221-E-006-066-MY3), Taiwan.
+
+% Can use something like this to put references on a page
+% by themselves when using endfloat and the captionsoff option.
+\ifCLASSOPTIONcaptionsoff
+  \newpage
+\fi
+
+\bibliographystyle{IEEEtran}
+\bibliography{refbibtex}
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{BIOG/rabbit.jpg}}]{Min-Wen Chao}
+received the BS degree in Mathematics from the National Cheng-Kung University, Taiwan, in 2003 and the MS degree from the Department of Computer Science and Information Engineering, National Cheng Kuang University, Tainan, Taiwan, in 2005. She is currently working toward the PhD degree in the Department of Computer Science and Information Engineering, National Cheng-Kung University. Her research interests include computer graphics and Data hiding.
+\end{IEEEbiography}
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{BIOG/Lin.png}}]{Chao-Hung Lin} received his MS and PhD degree in computer engineering from National Cheng-Kung University, Taiwan in 1998 and 2004, respectively. He is currently an associate professor in the department of geomatics at National Cheng-Kung University in Tainan, Taiwan. He leads the Digital Geometry Laboratory, National Cheng-Kung University. His research interests include digital geometry processing, digital map generation, information visualization, and remote sensing. He is a member of IEEE and ACM.
+\end{IEEEbiography}
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{BIOG/Jackie.png}}]{Jackie Assa} Jackie Assa received his BsC, MsC (Cum-Laude) and PhD in computer sciences from the Tel Aviv University in 1993, 1998 and 2010 respectively. He collaborated closely with researchers from various academic and industry research institutes on problems in the fields of image processing, 3D modeling, human animation, animation and video summarization and camera control.He now works as a consultant for leading companies, on problems in computer graphics, data visualization, video analysis and computer vision.
+\end{IEEEbiography}
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{BIOG/tony.jpg}}]{Tong-Yee Lee}
+received the PhD degree in computer engineering from Washington State University, Pullman, in May 1995. He is currently a distinguished professor in the Department of Computer Science and Information Engineering, National Cheng-Kung University, Tainan, Taiwan, ROC. He leads the Computer Graphics Group, Visual System Laboratory, National Cheng-Kung University (http://graphics.csie.ncku.edu.tw/). His current research interests include computer graphics, nonphotorealistic rendering, medical visualization, virtual reality, and media resizing. He also serves on the editorial boards of the IEEE Transactions on Information Technology in Biomedicine, the Visual Computer and the Computers and Graphics Journal. He served as a member of the international program committees of several conferences including the IEEE Visualization, the Pacific Graphics, the IEEE Pacific Visualization Symposium, the IEEE Virtual Reality, the IEEE-EMBS International Conference on Information Technology and Applications in Biomedicine, and the International Conference on Artificial Reality and Telexistence. He is a senior member of the IEEE and the member of the ACM.
+\end{IEEEbiography}
+% that's all folks
+\end{document}
+
+
+
